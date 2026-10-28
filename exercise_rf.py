@@ -13,22 +13,19 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import sklearn.ensemble as sk_ensemble
 from sklearn.datasets import make_moons
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import accuracy_score
 
 
-def main(save_fig: bool, result_dir: str, num_trees: int, tree_depth: int, seed=None):
-    """Trains a decision forest classifier on the two-moons dataset.
-
-    seed: fixes the generated data and the forest so results are reproducible
-    (None = new random data every run, as in the original starter code).
-    """
+def main(save_fig: bool, result_dir: str, num_trees: int, tree_depth: int):
+    """Trains a decision forest classifier on a the iris dataset."""
 
     # generate result directory
     os.makedirs(result_dir, exist_ok=True)
 
-    # generate the two-moons toy data
-    data = make_moons(n_samples=1500, noise=0.23, random_state=seed)
+    # load iris data
+
+    data = make_moons(n_samples=1500, noise=0.23, random_state=None)
     features, labels = data[0], data[1]
 
     # split into training and  testing data
@@ -36,15 +33,28 @@ def main(save_fig: bool, result_dir: str, num_trees: int, tree_depth: int, seed=
         features, labels, test_size=0.5, random_state=42
     )
 
-    # initialize the forest
-    forest = sk_ensemble.RandomForestClassifier(
-        max_features=feat_train.shape[1], n_estimators=num_trees, max_depth=tree_depth,
-        random_state=seed,
+    # search for the best number of trees and tree depth (5-fold CV on training data only)
+    print("Searching for best number of trees and tree depth...")
+    param_grid = {
+        "n_estimators": [1, 5, 10, 25, 50, 100, 200],
+        "max_depth": list(range(1, 16)),
+    }
+    search = GridSearchCV(
+        sk_ensemble.RandomForestClassifier(max_features=feat_train.shape[1]),
+        param_grid,
+        cv=5,
+        n_jobs=-1,
     )
 
-    # train the forest
+    # train the forest (refit on the full training set with the best parameters)
     print("Decision forest training...")
-    forest.fit(feat_train, labels_train)
+    search.fit(feat_train, labels_train)
+    forest = search.best_estimator_
+    num_trees = search.best_params_["n_estimators"]
+    tree_depth = search.best_params_["max_depth"]
+    print("Best number of trees: {0:d}".format(num_trees))
+    print("Best tree depth: {0:d}".format(tree_depth))
+    print("Best CV accuracy: {0:.2%}".format(search.best_score_))
 
     # apply the forest to test data
     print("Decision forest testing...")
@@ -78,7 +88,7 @@ def main(save_fig: bool, result_dir: str, num_trees: int, tree_depth: int, seed=
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
 
     # Get the color maps
-    cm = plt.get_cmap("RdBu")  # plt.cm.get_cmap was removed in matplotlib 3.9
+    cm = plt.get_cmap("RdBu")
     cm_bright = ListedColormap(["#FF0000", "#0000FF"])
 
     # Plot the training points
@@ -192,12 +202,5 @@ if __name__ == "__main__":
         help="Maximum depth of the trees in the random forest classifier.",
     )
 
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=None,
-        help="Random seed for data and forest (default: random every run).",
-    )
-
     args = parser.parse_args()
-    main(args.save_fig, args.result_dir, args.num_trees, args.tree_depth, args.seed)
+    main(args.save_fig, args.result_dir, args.num_trees, args.tree_depth)
