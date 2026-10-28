@@ -28,7 +28,7 @@ On my run the search picked **200 trees with a max depth of 7**:
 
 For comparison, the default (1 tree, depth 1) only got about 83% on the test set and basically just drew a horizontal line through the data. Past a depth of about 5 the CV score barely changes. It sits around 93–94% and even drops slightly at the deepest settings, because deeper trees mostly start fitting the noise.
 
-## Why my results don't match my friend's
+## Why results will not match others and How to get identical results 
 
 A friend and I ran the same settings and got different numbers. It isn't the noise level itself (`noise=0.23` is the same for both of us). The issue is that nothing in the script fixes a random seed:
 
