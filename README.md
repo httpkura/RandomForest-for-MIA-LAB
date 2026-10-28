@@ -1,51 +1,43 @@
-# Random Forest Exercise – Hyperparameter Search
+# Random Forest Exercise 2
 
-`exercise_rf.py` trains a random forest on a 2-D two-moons point cloud and plots its decision boundary. The script searches automatically for the best number of trees and tree depth.
+For this exercise I extended `exercise_rf.py` so it finds a good number of trees and tree depth on its own. Before, you had to pick them by hand.
 
-## Running it
+## How to run
 
 ```bash
 pip install -r requirements.txt
 python exercise_rf.py
 ```
 
-The plot is saved to `random_forest_plots/`.
+The plot gets saved to `random_forest_plots/`.
 
-## What was changed
+## What I changed
 
-1. **Hyperparameter search.** A `GridSearchCV` replaces the fixed forest settings. It tries every combination of:
-   - number of trees: 1, 5, 10, 25, 50, 100, 200
-   - max tree depth: 1 to 15
+I tried to keep the changes small and stick to the task:
 
-   It scores each combination with 5-fold cross-validation on the **training data only**, so the test set plays no part in the choice. The best model is then refit on the full training set and used for testing and plotting. The best values and their CV accuracy are printed, and the plot shows them.
-   The `--num_trees` and `--tree_depth` arguments still exist, but the search result overrides them.
-2. **Import.** Added `GridSearchCV` from `sklearn.model_selection`.
-3. **Bug fix.** `plt.cm.get_cmap("RdBu")` became `plt.get_cmap("RdBu")`. The old call was removed in matplotlib 3.9, the version pinned in `requirements.txt`, and the script crashed without this fix.
+- **Added a grid search.** I wrapped the forest in `GridSearchCV` and tested 1, 5, 10, 25, 50, 100 and 200 trees against every depth from 1 to 15. Each combination is scored with 5-fold cross-validation on the training set only. I didn't want the test set involved in choosing the parameters, otherwise the test accuracy wouldn't really mean anything. The best model is then refit on the whole training set and used for the rest of the script, so the plot shows the chosen values. `--num_trees` and `--tree_depth` are still in the argparse, but the search overrides them now.
+- **Fixed a crash.** `plt.cm.get_cmap("RdBu")` doesn't exist anymore in matplotlib 3.9, which is the version in `requirements.txt`, so the script wouldn't run. I changed it to `plt.get_cmap("RdBu")`.
 
-## Example result
+## Results
 
-On one run, the search picked **200 trees** with **max depth 7**:
+On my run the search picked **200 trees with a max depth of 7**:
 
-| | Accuracy |
-|---|---|
-| Cross-validation (best) | 94.67% |
-| Training | 98.13% |
-| Testing | 93.73% |
+- CV accuracy: 94.67%
+- Training accuracy: 98.13%
+- Testing accuracy: 93.73%
 
-For comparison, the template's default of 1 tree at depth 1 reached about 83% test accuracy.
+For comparison, the default (1 tree, depth 1) only got about 83% on the test set and basically just drew a horizontal line through the data. Past a depth of about 5 the CV score barely changes. It sits around 93–94% and even drops slightly at the deepest settings, because deeper trees mostly start fitting the noise.
 
-## Why results differ between runs (and between people)
+## Why my results don't match my friend's
 
-Two people running the same script with the same number of trees and depth can get different accuracies. The noise level (`noise=0.23`) is the same for everyone, but the script never fixes its random seeds, so two parts of it change on every run:
+A friend and I ran the same settings and got different numbers. It isn't the noise level itself (`noise=0.23` is the same for both of us). The issue is that nothing in the script fixes a random seed:
 
-1. **The data.** `make_moons(..., random_state=None)` generates a new set of 1500 points each time, with the noise falling differently. Each run trains and tests on a different dataset. This is the main cause.
-2. **The forest.** `RandomForestClassifier` has no `random_state`. Each tree trains on a random bootstrap resample of the training data, so the trees differ even when the data is the same.
+1. `make_moons(..., random_state=None)` creates a new random dataset every time you run it, with the noise landing differently. So we were training and testing on different data. This is the main reason.
+2. `RandomForestClassifier` has no `random_state`, so the bootstrap samples for each tree are different too, even on the same data.
 
-The train/test split is fixed (`random_state=42`), but that doesn't help when the data going into it changes. Because the data varies, the chosen depth also varies slightly between runs, usually between 6 and 10.
+The train/test split has `random_state=42`, but that doesn't help when the data going into it is already different. This also means the best depth found by the search moves around a bit between runs, usually somewhere between 5 and 8. Since the scores in that range are so close, which one wins comes down to the random data.
 
-### Making results reproducible
-
-Fix both seeds:
+To get identical results you'd set both seeds:
 
 ```python
 data = make_moons(n_samples=1500, noise=0.23, random_state=42)
@@ -53,6 +45,4 @@ data = make_moons(n_samples=1500, noise=0.23, random_state=42)
 sk_ensemble.RandomForestClassifier(max_features=feat_train.shape[1], random_state=42)
 ```
 
-With these seeds, everyone gets identical results, as long as they use the same scikit-learn version.
-
-The template leaves `random_state=None`, probably on purpose, to show how results vary from run to run. That's why the submitted code doesn't fix the seeds.
+I left the seeds unset in my submission because the template had `random_state=None`. I think that was on purpose, to show how much the results vary between runs.
